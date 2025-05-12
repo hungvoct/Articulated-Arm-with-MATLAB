@@ -1,0 +1,764 @@
+classdef articulated_test < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                     matlab.ui.Figure
+        donvia                       matlab.ui.control.Label
+        donviv                       matlab.ui.control.Label
+        FowardKinematics             matlab.ui.control.Label
+        GoHomeButton                 matlab.ui.control.Button
+        TrajectoryPlanningButton     matlab.ui.control.Button
+        amaxValue                    matlab.ui.control.NumericEditField
+        vmaxValue                    matlab.ui.control.NumericEditField
+        amaxLabel                    matlab.ui.control.Label
+        vmaxLabel                    matlab.ui.control.Label
+        DifferentialKinematicsLabel  matlab.ui.control.Label
+        zLabel_4                     matlab.ui.control.Label
+        yLabel_4                     matlab.ui.control.Label
+        xLabel_4                     matlab.ui.control.Label
+        zValue_2                     matlab.ui.control.NumericEditField
+        yValue_2                     matlab.ui.control.NumericEditField
+        xValue_2                     matlab.ui.control.NumericEditField
+        zfLabel                      matlab.ui.control.Label
+        yfLabel                      matlab.ui.control.Label
+        xfLabel                      matlab.ui.control.Label
+        zset2                        matlab.ui.control.NumericEditField
+        yset2                        matlab.ui.control.NumericEditField
+        xset2                        matlab.ui.control.NumericEditField
+        OffWorkspaceButton           matlab.ui.control.Button
+        DrawWorkspaceButton          matlab.ui.control.Button
+        Inverse_Kinematics           matlab.ui.control.Label
+        zLabel_2                     matlab.ui.control.Label
+        yLabel_2                     matlab.ui.control.Label
+        xLabel_2                     matlab.ui.control.Label
+        xset                         matlab.ui.control.NumericEditField
+        yset                         matlab.ui.control.NumericEditField
+        zset                         matlab.ui.control.NumericEditField
+        InverseButton                matlab.ui.control.Button
+        YawLabel                     matlab.ui.control.Label
+        PitchLabel                   matlab.ui.control.Label
+        zLabel                       matlab.ui.control.Label
+        yLabel                       matlab.ui.control.Label
+        xLabel                       matlab.ui.control.Label
+        RollLabel                    matlab.ui.control.Label
+        EndEffectorPoseOrientationLabel  matlab.ui.control.Label
+        yawValue                     matlab.ui.control.NumericEditField
+        pitchValue                   matlab.ui.control.NumericEditField
+        zValue                       matlab.ui.control.NumericEditField
+        yValue                       matlab.ui.control.NumericEditField
+        xValue                       matlab.ui.control.NumericEditField
+        rollValue                    matlab.ui.control.NumericEditField
+        theta3Value                  matlab.ui.control.NumericEditField
+        theta2Value                  matlab.ui.control.NumericEditField
+        theta1Value                  matlab.ui.control.NumericEditField
+        ForwardButton                matlab.ui.control.Button
+        theta3Slider                 matlab.ui.control.Slider
+        Theta3SliderLabel            matlab.ui.control.Label
+        theta2Slider                 matlab.ui.control.Slider
+        Theta2SliderLabel            matlab.ui.control.Label
+        theta1Slider                 matlab.ui.control.Slider
+        Theta1SliderLabel            matlab.ui.control.Label
+        Theta3ddotGraph              matlab.ui.control.UIAxes
+        Theta2ddotGraph              matlab.ui.control.UIAxes
+        Theta1ddotGraph              matlab.ui.control.UIAxes
+        Theta2dotGraph               matlab.ui.control.UIAxes
+        Theta1dotGraph               matlab.ui.control.UIAxes
+        Theta3dotGraph               matlab.ui.control.UIAxes
+        Theta1Graph                  matlab.ui.control.UIAxes
+        Theta3Graph                  matlab.ui.control.UIAxes
+        Theta2Graph                  matlab.ui.control.UIAxes
+        VelocityGraph                matlab.ui.control.UIAxes
+        RobotGraph                   matlab.ui.control.UIAxes
+    end
+
+    
+    properties (Access = private)
+    end
+    
+    properties (Access = public)
+        WorkspacePlot % Object chứa workspace
+        theta1_current = 0; % Góc hiện tại của khớp 1
+        theta2_current = 0; % Góc hiện tại của khớp 2
+        theta3_current = 0; % Góc hiện tại của khớp 3
+        end_effector_path = [];
+    end
+    
+    methods (Access = private)
+    end
+    
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+            % Tham số DH cho mỗi khớp (d, theta, a, alpha)
+            %d1 = 312; a1 = 0; alpha1 = pi/2;
+            %d2 = 0; a2 = 410; alpha2 = 0;
+            %d3 = 0; a3 = 448; alpha3 = 0;
+
+            d1 = 0.5; a1 = 0; alpha1 = pi/2;
+            d2 = 0; a2 = 0.5; alpha2 = 0;
+            d3 = 0; a3 = 0.5; alpha3 = 0;
+        
+            x0 = 0;
+            y0 = 0;
+            z0 = 0;
+        
+            base_pose = [x0; y0; z0; 1];
+        
+            % Ma trận chuyển đổi cho từng khớp (Ban đầu
+            % theta1=theta2=theta3 = 0)
+            A1 = DH_Matrix(d1, 0, a1, alpha1);  
+            A2 = DH_Matrix(d2, 0, a2, alpha2);
+            A3 = DH_Matrix(d3, 0, a3, alpha3);
+        
+            % Ma trận DH từ base tới end-effector
+            T = A1 * A2 * A3;
+            
+            l1_pose = A1*base_pose;
+            x1 = l1_pose(1);
+            y1 = l1_pose(2);
+            z1 = l1_pose(3);
+        
+            l2_pose = A1*A2*base_pose;
+            x2 = l2_pose(1);
+            y2 = l2_pose(2);
+            z2 = l2_pose(3);
+            
+            % Tọa độ của end-effector
+            end_pose = T*base_pose;
+            x3 = end_pose(1);
+            y3 = end_pose(2);
+            z3 = end_pose(3);
+        
+            %Tính Roll - Pitch - Yaw
+            rpy = CaculateR_P_Y(T);
+            roll = rpy(1);
+            pitch = rpy(2);
+            yaw = rpy(3);
+        
+            % Xóa trục cũ và thiết lập chế độ 3D
+            cla(app.RobotGraph);  % Xóa trục trước khi vẽ mới
+            hold(app.RobotGraph, 'on');
+            grid(app.RobotGraph, 'on'); % Bật lưới
+            view(app.RobotGraph, 3);    % Đặt chế độ xem 3D
+        
+            % Vẽ robot trong không gian 3D
+            plot3(app.RobotGraph, [0, x0], [0, y0], [0, z0], 'black', 'LineWidth', 4); % Đoạn nối 0
+            plot3(app.RobotGraph, [x0, x1], [y0, y1], [z0, z1], 'r-', 'LineWidth', 4); % Đoạn nối 1
+            plot3(app.RobotGraph, [x1, x2], [y1, y2], [z1, z2], 'g-', 'LineWidth', 4); % Đoạn nối 2
+            plot3(app.RobotGraph, [x2, x3], [y2, y3], [z2, z3], 'b-', 'LineWidth', 4); % Đoạn nối 3
+            
+            %Vẽ base
+            % Thiết lập bán kính và số lượng điểm cho hình tròn
+            r = 0.3; % Bán kính hình tròn
+            goc = linspace(0, 2*pi, 100); % Góc từ 0 đến 2*pi
+            x_circle = x0 + r * cos(goc); % Tọa độ x của hình tròn
+            y_circle = y0 + r * sin(goc); % Tọa độ y của hình tròn
+            plot(app.RobotGraph, x_circle, y_circle, 'b-', 'LineWidth', 2); % Base
+
+            plot3(app.RobotGraph, x1, y1, z1, 'ko', 'MarkerSize', 4, 'MarkerFaceColor', 'k'); % Joint 1
+            plot3(app.RobotGraph, x2, y2, z2, 'ko', 'MarkerSize', 4, 'MarkerFaceColor', 'k'); % Joint 2
+            plot3(app.RobotGraph, x3, y3, z3, 'ko', 'MarkerSize', 8, 'MarkerFaceColor', 'k'); % End - effector
+        
+            % Thiết lập giới hạn cho trục
+            axis(app.RobotGraph, [-2 2 -2 2 0 2]);
+            hold(app.RobotGraph, 'off'); % Kết thúc giữ đồ thị
+            
+            app.xValue.Value = x3;
+            app.yValue.Value = y3;
+            app.zValue.Value = z3;
+            %Value_2 là ô chứa giá trị nằm ở khung Differential Kinematics
+            app.xValue_2.Value = x3;
+            app.yValue_2.Value = y3;
+            app.zValue_2.Value = z3;
+            app.rollValue.Value = roll;
+            app.pitchValue.Value = pitch;
+            app.yawValue.Value = yaw;
+        end
+
+        % Button pushed function: ForwardButton
+        function ForwardButtonPushed(app, event)
+            % robot di chuyển đều theo số steps
+            steps = 20;
+
+            % Lấy giá trị các góc target từ slider
+            theta1_target = deg2rad(app.theta1Slider.Value);
+            theta2_target = deg2rad(app.theta2Slider.Value);
+            theta3_target = deg2rad(app.theta3Slider.Value);
+        
+            % Giá trị hiện tại
+            theta1_current = app.theta1_current;
+            theta2_current = app.theta2_current;
+            theta3_current = app.theta3_current;
+        
+            for i = 1:steps
+                % Tính lại các góc ở step thứ i
+                theta1 = theta1_current + (theta1_target - theta1_current) * (i / steps);
+                theta2 = theta2_current + (theta2_target - theta2_current) * (i / steps);
+                theta3 = theta3_current + (theta3_target - theta3_current) * (i / steps);
+                
+                %luu lai cac gia tri theta cho lan sau
+                app.theta1_current = theta1;
+                app.theta2_current = theta2;
+                app.theta3_current = theta3;
+                
+                % Cập nhật tọa độ end-effector
+                updateRobotPose(app, theta1, theta2, theta3);
+                pause(0.05); % Điều chỉnh tốc độ di chuyển
+            end
+        end
+
+        % Value changed function: theta1Slider
+        function theta1SliderValueChanged(app, event)
+            app.theta1Value.Value = app.theta1Slider.Value;
+        end
+
+        % Value changed function: theta2Slider
+        function theta2SliderValueChanged(app, event)
+            app.theta2Value.Value = app.theta2Slider.Value;
+        end
+
+        % Value changed function: theta3Slider
+        function theta3SliderValueChanged(app, event)
+            app.theta3Value.Value = app.theta3Slider.Value;
+        end
+
+        % Value changed function: theta1Value
+        function theta1ValueValueChanged(app, event)
+            app.theta1Slider.Value = app.theta1Value.Value;
+        end
+
+        % Value changed function: theta2Value
+        function theta2ValueValueChanged(app, event)
+            app.theta2Slider.Value = app.theta2Value.Value;
+        end
+
+        % Value changed function: theta3Value
+        function theta3ValueValueChanged(app, event)
+            app.theta3Slider.Value = app.theta3Value.Value;
+        end
+
+        % Button pushed function: InverseButton
+        function InverseButtonPushed(app, event)
+            % Giá trị hiện tại (sử dụng từ các thuộc tính lưu trữ)
+            theta1_current = app.theta1_current;
+            theta2_current = app.theta2_current;
+            theta3_current = app.theta3_current;
+        
+            % Số bước để di chuyển từ từ
+            steps = 20;
+            
+            theta_target = GetInverse(app);
+            theta1_target = theta_target(1);
+            theta2_target = theta_target(2);
+            theta3_target = theta_target(3);
+
+            % Di chuyển từ từ đến vị trí mới
+            for i = 1:steps
+                % Tính toán các góc trung gian
+                theta1 = theta1_current + (theta1_target - theta1_current) * (i / steps);
+                theta2 = theta2_current + (theta2_target - theta2_current) * (i / steps);
+                theta3 = theta3_current + (theta3_target - theta3_current) * (i / steps);
+        
+                % Lưu lại các giá trị theta cho lần sau
+                app.theta1_current = theta1;
+                app.theta2_current = theta2;
+                app.theta3_current = theta3;
+        
+                % Cập nhật giá trị trên giao diện
+                app.theta1Slider.Value = rad2deg(theta1);
+                app.theta2Slider.Value = rad2deg(theta2);
+                app.theta3Slider.Value = rad2deg(theta3);
+                app.theta1Value.Value = rad2deg(theta1);
+                app.theta2Value.Value = rad2deg(theta2);
+                app.theta3Value.Value = rad2deg(theta3);
+        
+                % Cập nhật tọa độ end-effector
+                updateRobotPose(app, theta1, theta2, theta3);
+                pause(0.05); % Điều chỉnh tốc độ di chuyển
+            end
+        end
+
+        % Button pushed function: DrawWorkspaceButton
+        function DrawWorkspaceButtonPushed(app, event)
+            plotWorkspace(app);
+        end
+
+        % Button pushed function: OffWorkspaceButton
+        function OffWorkspaceButtonPushed(app, event)
+            removeWorkspace(app);
+        end
+
+        % Button pushed function: TrajectoryPlanningButton
+        function TrajectoryPlanningButtonPushed(app, event)
+            differentialKinematics(app);
+        end
+
+        % Button pushed function: GoHomeButton
+        function GoHomeButtonPushed(app, event)
+            % robot di chuyển đều theo số steps
+            steps = 20;
+
+            % Lấy giá trị các góc target từ slider
+            theta1_target = 0;
+            theta2_target = 0;
+            theta3_target = 0;
+        
+            % Giá trị hiện tại
+            theta1_current = app.theta1_current;
+            theta2_current = app.theta2_current;
+            theta3_current = app.theta3_current;
+        
+            for i = 1:steps
+                % Tính lại các góc ở step thứ i
+                theta1 = theta1_current + (theta1_target - theta1_current) * (i / steps);
+                theta2 = theta2_current + (theta2_target - theta2_current) * (i / steps);
+                theta3 = theta3_current + (theta3_target - theta3_current) * (i / steps);
+                
+                %luu lai cac gia tri theta cho lan sau
+                app.theta1_current = theta1;
+                app.theta2_current = theta2;
+                app.theta3_current = theta3;
+
+                % Cập nhật giá trị trên giao diện
+                app.theta1Slider.Value = rad2deg(theta1);
+                app.theta2Slider.Value = rad2deg(theta2);
+                app.theta3Slider.Value = rad2deg(theta3);
+                app.theta1Value.Value = rad2deg(theta1);
+                app.theta2Value.Value = rad2deg(theta2);
+                app.theta3Value.Value = rad2deg(theta3);
+                
+                % Cập nhật tọa độ end-effector
+                updateRobotPose(app, theta1, theta2, theta3);
+                pause(0.05); % Điều chỉnh tốc độ di chuyển
+            end
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Position = [100 100 742 589];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create RobotGraph
+            app.RobotGraph = uiaxes(app.UIFigure);
+            title(app.RobotGraph, 'Articulated Arm')
+            xlabel(app.RobotGraph, 'X(m)')
+            ylabel(app.RobotGraph, 'Y(m)')
+            zlabel(app.RobotGraph, 'Z(m)')
+            app.RobotGraph.Position = [469 438 221 145];
+
+            % Create VelocityGraph
+            app.VelocityGraph = uiaxes(app.UIFigure);
+            title(app.VelocityGraph, 'Vận tốc end-effector')
+            xlabel(app.VelocityGraph, 't')
+            ylabel(app.VelocityGraph, 'v')
+            app.VelocityGraph.ZTick = [];
+            app.VelocityGraph.Position = [566 317 144 95];
+
+            % Create Theta2Graph
+            app.Theta2Graph = uiaxes(app.UIFigure);
+            title(app.Theta2Graph, 'Theta2')
+            xlabel(app.Theta2Graph, 't')
+            ylabel(app.Theta2Graph, 'theta2')
+            app.Theta2Graph.ZTick = [];
+            app.Theta2Graph.Position = [239 242 144 80];
+
+            % Create Theta3Graph
+            app.Theta3Graph = uiaxes(app.UIFigure);
+            title(app.Theta3Graph, 'Theta3')
+            xlabel(app.Theta3Graph, 't')
+            ylabel(app.Theta3Graph, 'theta3')
+            app.Theta3Graph.ZTick = [];
+            app.Theta3Graph.Position = [239 169 144 75];
+
+            % Create Theta1Graph
+            app.Theta1Graph = uiaxes(app.UIFigure);
+            title(app.Theta1Graph, 'Theta1')
+            xlabel(app.Theta1Graph, 't')
+            ylabel(app.Theta1Graph, 'theta1')
+            zlabel(app.Theta1Graph, 'Z')
+            app.Theta1Graph.Position = [239 326 144 76];
+
+            % Create Theta3dotGraph
+            app.Theta3dotGraph = uiaxes(app.UIFigure);
+            title(app.Theta3dotGraph, 'Theta3dot')
+            xlabel(app.Theta3dotGraph, 't')
+            ylabel(app.Theta3dotGraph, 'theta3dot')
+            app.Theta3dotGraph.ZTick = [];
+            app.Theta3dotGraph.Position = [583 33 144 95];
+
+            % Create Theta1dotGraph
+            app.Theta1dotGraph = uiaxes(app.UIFigure);
+            title(app.Theta1dotGraph, 'Theta1dot')
+            xlabel(app.Theta1dotGraph, 't')
+            ylabel(app.Theta1dotGraph, 'theta1dot')
+            zlabel(app.Theta1dotGraph, 'Z')
+            app.Theta1dotGraph.Position = [582 156 145 84];
+
+            % Create Theta2dotGraph
+            app.Theta2dotGraph = uiaxes(app.UIFigure);
+            title(app.Theta2dotGraph, 'Theta2dot')
+            xlabel(app.Theta2dotGraph, 't')
+            ylabel(app.Theta2dotGraph, 'theta2dot')
+            app.Theta2dotGraph.ZTick = [];
+            app.Theta2dotGraph.Position = [407 33 144 95];
+
+            % Create Theta1ddotGraph
+            app.Theta1ddotGraph = uiaxes(app.UIFigure);
+            title(app.Theta1ddotGraph, 'Theta1ddot')
+            xlabel(app.Theta1ddotGraph, 't')
+            ylabel(app.Theta1ddotGraph, 'theta1ddot')
+            zlabel(app.Theta1ddotGraph, 'Z')
+            app.Theta1ddotGraph.Position = [47 119 145 84];
+
+            % Create Theta2ddotGraph
+            app.Theta2ddotGraph = uiaxes(app.UIFigure);
+            title(app.Theta2ddotGraph, 'Theta2ddot')
+            xlabel(app.Theta2ddotGraph, 't')
+            ylabel(app.Theta2ddotGraph, 'theta2ddot')
+            app.Theta2ddotGraph.ZTick = [];
+            app.Theta2ddotGraph.Position = [47 17 144 95];
+
+            % Create Theta3ddotGraph
+            app.Theta3ddotGraph = uiaxes(app.UIFigure);
+            title(app.Theta3ddotGraph, 'Theta3ddot')
+            xlabel(app.Theta3ddotGraph, 't')
+            ylabel(app.Theta3ddotGraph, 'theta3ddot')
+            app.Theta3ddotGraph.ZTick = [];
+            app.Theta3ddotGraph.Position = [220 17 144 95];
+
+            % Create Theta1SliderLabel
+            app.Theta1SliderLabel = uilabel(app.UIFigure);
+            app.Theta1SliderLabel.HorizontalAlignment = 'right';
+            app.Theta1SliderLabel.Position = [13 538 42 22];
+            app.Theta1SliderLabel.Text = 'Theta1';
+
+            % Create theta1Slider
+            app.theta1Slider = uislider(app.UIFigure);
+            app.theta1Slider.Limits = [-180 180];
+            app.theta1Slider.ValueChangedFcn = createCallbackFcn(app, @theta1SliderValueChanged, true);
+            app.theta1Slider.Position = [76 547 42 7];
+
+            % Create Theta2SliderLabel
+            app.Theta2SliderLabel = uilabel(app.UIFigure);
+            app.Theta2SliderLabel.HorizontalAlignment = 'right';
+            app.Theta2SliderLabel.Position = [13 489 42 22];
+            app.Theta2SliderLabel.Text = 'Theta2';
+
+            % Create theta2Slider
+            app.theta2Slider = uislider(app.UIFigure);
+            app.theta2Slider.Limits = [-180 180];
+            app.theta2Slider.ValueChangedFcn = createCallbackFcn(app, @theta2SliderValueChanged, true);
+            app.theta2Slider.Position = [76 498 42 7];
+
+            % Create Theta3SliderLabel
+            app.Theta3SliderLabel = uilabel(app.UIFigure);
+            app.Theta3SliderLabel.HorizontalAlignment = 'right';
+            app.Theta3SliderLabel.Position = [14 444 42 22];
+            app.Theta3SliderLabel.Text = 'Theta3';
+
+            % Create theta3Slider
+            app.theta3Slider = uislider(app.UIFigure);
+            app.theta3Slider.Limits = [-180 180];
+            app.theta3Slider.ValueChangedFcn = createCallbackFcn(app, @theta3SliderValueChanged, true);
+            app.theta3Slider.Position = [77 453 42 7];
+
+            % Create ForwardButton
+            app.ForwardButton = uibutton(app.UIFigure, 'push');
+            app.ForwardButton.ButtonPushedFcn = createCallbackFcn(app, @ForwardButtonPushed, true);
+            app.ForwardButton.Position = [60 400 75 23];
+            app.ForwardButton.Text = 'Forward';
+
+            % Create theta1Value
+            app.theta1Value = uieditfield(app.UIFigure, 'numeric');
+            app.theta1Value.ValueChangedFcn = createCallbackFcn(app, @theta1ValueValueChanged, true);
+            app.theta1Value.Position = [138 539 40 21];
+
+            % Create theta2Value
+            app.theta2Value = uieditfield(app.UIFigure, 'numeric');
+            app.theta2Value.ValueChangedFcn = createCallbackFcn(app, @theta2ValueValueChanged, true);
+            app.theta2Value.Position = [138 491 40 20];
+
+            % Create theta3Value
+            app.theta3Value = uieditfield(app.UIFigure, 'numeric');
+            app.theta3Value.ValueChangedFcn = createCallbackFcn(app, @theta3ValueValueChanged, true);
+            app.theta3Value.Position = [139 447 40 21];
+
+            % Create rollValue
+            app.rollValue = uieditfield(app.UIFigure, 'numeric');
+            app.rollValue.Position = [124 327 30 19];
+
+            % Create xValue
+            app.xValue = uieditfield(app.UIFigure, 'numeric');
+            app.xValue.Position = [40 326 30 20];
+
+            % Create yValue
+            app.yValue = uieditfield(app.UIFigure, 'numeric');
+            app.yValue.Position = [40 285 30 22];
+
+            % Create zValue
+            app.zValue = uieditfield(app.UIFigure, 'numeric');
+            app.zValue.Position = [40 248 30 19];
+
+            % Create pitchValue
+            app.pitchValue = uieditfield(app.UIFigure, 'numeric');
+            app.pitchValue.Position = [124 286 30 20];
+
+            % Create yawValue
+            app.yawValue = uieditfield(app.UIFigure, 'numeric');
+            app.yawValue.Position = [124 247 30 21];
+
+            % Create EndEffectorPoseOrientationLabel
+            app.EndEffectorPoseOrientationLabel = uilabel(app.UIFigure);
+            app.EndEffectorPoseOrientationLabel.HorizontalAlignment = 'center';
+            app.EndEffectorPoseOrientationLabel.Position = [16 350 176 26];
+            app.EndEffectorPoseOrientationLabel.Text = 'End-Effector Pose & Orientation';
+
+            % Create RollLabel
+            app.RollLabel = uilabel(app.UIFigure);
+            app.RollLabel.HorizontalAlignment = 'center';
+            app.RollLabel.Position = [93 325 26 22];
+            app.RollLabel.Text = 'Roll';
+
+            % Create xLabel
+            app.xLabel = uilabel(app.UIFigure);
+            app.xLabel.HorizontalAlignment = 'center';
+            app.xLabel.Position = [19 327 18 18];
+            app.xLabel.Text = 'x';
+
+            % Create yLabel
+            app.yLabel = uilabel(app.UIFigure);
+            app.yLabel.HorizontalAlignment = 'center';
+            app.yLabel.Position = [16 283 25 22];
+            app.yLabel.Text = 'y';
+
+            % Create zLabel
+            app.zLabel = uilabel(app.UIFigure);
+            app.zLabel.HorizontalAlignment = 'center';
+            app.zLabel.Position = [16 246 25 22];
+            app.zLabel.Text = 'z';
+
+            % Create PitchLabel
+            app.PitchLabel = uilabel(app.UIFigure);
+            app.PitchLabel.HorizontalAlignment = 'center';
+            app.PitchLabel.Position = [92 285 32 22];
+            app.PitchLabel.Text = 'Pitch';
+
+            % Create YawLabel
+            app.YawLabel = uilabel(app.UIFigure);
+            app.YawLabel.HorizontalAlignment = 'center';
+            app.YawLabel.Position = [92 246 28 22];
+            app.YawLabel.Text = 'Yaw';
+
+            % Create InverseButton
+            app.InverseButton = uibutton(app.UIFigure, 'push');
+            app.InverseButton.ButtonPushedFcn = createCallbackFcn(app, @InverseButtonPushed, true);
+            app.InverseButton.Position = [220 418 77 28];
+            app.InverseButton.Text = 'Inverse';
+
+            % Create zset
+            app.zset = uieditfield(app.UIFigure, 'numeric');
+            app.zset.Position = [260 452 29 22];
+
+            % Create yset
+            app.yset = uieditfield(app.UIFigure, 'numeric');
+            app.yset.Position = [260 492 29 22];
+
+            % Create xset
+            app.xset = uieditfield(app.UIFigure, 'numeric');
+            app.xset.Position = [260 531 29 24];
+
+            % Create xLabel_2
+            app.xLabel_2 = uilabel(app.UIFigure);
+            app.xLabel_2.HorizontalAlignment = 'center';
+            app.xLabel_2.Position = [222 534 18 18];
+            app.xLabel_2.Text = 'x';
+
+            % Create yLabel_2
+            app.yLabel_2 = uilabel(app.UIFigure);
+            app.yLabel_2.HorizontalAlignment = 'center';
+            app.yLabel_2.Position = [220 495 25 22];
+            app.yLabel_2.Text = 'y';
+
+            % Create zLabel_2
+            app.zLabel_2 = uilabel(app.UIFigure);
+            app.zLabel_2.HorizontalAlignment = 'center';
+            app.zLabel_2.Position = [222 455 25 22];
+            app.zLabel_2.Text = 'z';
+
+            % Create Inverse_Kinematics
+            app.Inverse_Kinematics = uilabel(app.UIFigure);
+            app.Inverse_Kinematics.HorizontalAlignment = 'center';
+            app.Inverse_Kinematics.Position = [218 564 114 26];
+            app.Inverse_Kinematics.Text = 'Inverse Kinematics';
+
+            % Create DrawWorkspaceButton
+            app.DrawWorkspaceButton = uibutton(app.UIFigure, 'push');
+            app.DrawWorkspaceButton.ButtonPushedFcn = createCallbackFcn(app, @DrawWorkspaceButtonPushed, true);
+            app.DrawWorkspaceButton.Position = [355 559 100 25];
+            app.DrawWorkspaceButton.Text = 'DrawWorkspace';
+
+            % Create OffWorkspaceButton
+            app.OffWorkspaceButton = uibutton(app.UIFigure, 'push');
+            app.OffWorkspaceButton.ButtonPushedFcn = createCallbackFcn(app, @OffWorkspaceButtonPushed, true);
+            app.OffWorkspaceButton.Position = [355 531 100 23];
+            app.OffWorkspaceButton.Text = 'OffWorkspace';
+
+            % Create xset2
+            app.xset2 = uieditfield(app.UIFigure, 'numeric');
+            app.xset2.Position = [527 301 29 24];
+
+            % Create yset2
+            app.yset2 = uieditfield(app.UIFigure, 'numeric');
+            app.yset2.Position = [527 263 29 22];
+
+            % Create zset2
+            app.zset2 = uieditfield(app.UIFigure, 'numeric');
+            app.zset2.Position = [527 225 29 22];
+
+            % Create xfLabel
+            app.xfLabel = uilabel(app.UIFigure);
+            app.xfLabel.HorizontalAlignment = 'center';
+            app.xfLabel.Position = [498 300 25 22];
+            app.xfLabel.Text = 'xf';
+
+            % Create yfLabel
+            app.yfLabel = uilabel(app.UIFigure);
+            app.yfLabel.HorizontalAlignment = 'center';
+            app.yfLabel.Position = [497 263 25 22];
+            app.yfLabel.Text = 'yf';
+
+            % Create zfLabel
+            app.zfLabel = uilabel(app.UIFigure);
+            app.zfLabel.HorizontalAlignment = 'center';
+            app.zfLabel.Position = [497 225 25 22];
+            app.zfLabel.Text = 'zf';
+
+            % Create xValue_2
+            app.xValue_2 = uieditfield(app.UIFigure, 'numeric');
+            app.xValue_2.Position = [451 303 30 20];
+
+            % Create yValue_2
+            app.yValue_2 = uieditfield(app.UIFigure, 'numeric');
+            app.yValue_2.Position = [451 262 30 22];
+
+            % Create zValue_2
+            app.zValue_2 = uieditfield(app.UIFigure, 'numeric');
+            app.zValue_2.Position = [451 225 30 19];
+
+            % Create xLabel_4
+            app.xLabel_4 = uilabel(app.UIFigure);
+            app.xLabel_4.HorizontalAlignment = 'center';
+            app.xLabel_4.Position = [416 300 25 22];
+            app.xLabel_4.Text = 'x';
+
+            % Create yLabel_4
+            app.yLabel_4 = uilabel(app.UIFigure);
+            app.yLabel_4.HorizontalAlignment = 'center';
+            app.yLabel_4.Position = [416 260 25 22];
+            app.yLabel_4.Text = 'y';
+
+            % Create zLabel_4
+            app.zLabel_4 = uilabel(app.UIFigure);
+            app.zLabel_4.HorizontalAlignment = 'center';
+            app.zLabel_4.Position = [416 223 25 22];
+            app.zLabel_4.Text = 'z';
+
+            % Create DifferentialKinematicsLabel
+            app.DifferentialKinematicsLabel = uilabel(app.UIFigure);
+            app.DifferentialKinematicsLabel.HorizontalAlignment = 'center';
+            app.DifferentialKinematicsLabel.Position = [439 413 140 26];
+            app.DifferentialKinematicsLabel.Text = 'Differential Kinematics';
+
+            % Create vmaxLabel
+            app.vmaxLabel = uilabel(app.UIFigure);
+            app.vmaxLabel.HorizontalAlignment = 'center';
+            app.vmaxLabel.Position = [442 393 34 22];
+            app.vmaxLabel.Text = 'vmax';
+
+            % Create amaxLabel
+            app.amaxLabel = uilabel(app.UIFigure);
+            app.amaxLabel.HorizontalAlignment = 'center';
+            app.amaxLabel.Position = [443 364 34 22];
+            app.amaxLabel.Text = 'amax';
+
+            % Create vmaxValue
+            app.vmaxValue = uieditfield(app.UIFigure, 'numeric');
+            app.vmaxValue.Position = [489 391 39 20];
+
+            % Create amaxValue
+            app.amaxValue = uieditfield(app.UIFigure, 'numeric');
+            app.amaxValue.Position = [489 365 39 20];
+
+            % Create TrajectoryPlanningButton
+            app.TrajectoryPlanningButton = uibutton(app.UIFigure, 'push');
+            app.TrajectoryPlanningButton.ButtonPushedFcn = createCallbackFcn(app, @TrajectoryPlanningButtonPushed, true);
+            app.TrajectoryPlanningButton.Position = [596 277 118 27];
+            app.TrajectoryPlanningButton.Text = 'Trajectory Planning';
+
+            % Create GoHomeButton
+            app.GoHomeButton = uibutton(app.UIFigure, 'push');
+            app.GoHomeButton.ButtonPushedFcn = createCallbackFcn(app, @GoHomeButtonPushed, true);
+            app.GoHomeButton.Position = [364 474 78 29];
+            app.GoHomeButton.Text = 'GoHome';
+
+            % Create FowardKinematics
+            app.FowardKinematics = uilabel(app.UIFigure);
+            app.FowardKinematics.HorizontalAlignment = 'center';
+            app.FowardKinematics.Position = [39 564 114 26];
+            app.FowardKinematics.Text = 'Foward Kinematics';
+
+            % Create donviv
+            app.donviv = uilabel(app.UIFigure);
+            app.donviv.HorizontalAlignment = 'center';
+            app.donviv.Position = [538 390 25 22];
+            app.donviv.Text = 'm/s';
+
+            % Create donvia
+            app.donvia = uilabel(app.UIFigure);
+            app.donvia.HorizontalAlignment = 'center';
+            app.donvia.Position = [535 364 31 22];
+            app.donvia.Text = 'm/s2';
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = articulated_test
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
