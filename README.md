@@ -9,3 +9,8 @@ This project provides a comprehensive simulation of a Yaskawa GP7 articulated ro
 - **Trajectory Planning**: Generate smooth paths using Linear Segments with Parabolic Blends (LSPB).
 - **Visualization**: 3D rendering of robot motion in real time.
 - **Modular Design**: Easily extendable functions for custom robots.
+
+## Video demo:
+Watch my video demo here:
+https://drive.google.com/file/d/17hLkbycPP2DLiHDkiAkI7zYPZSC0IhEP/view?usp=drive_link
+
